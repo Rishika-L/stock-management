@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Stock Management</title>
+<style>
+    body {
+        font-family: Arial, sans-serif;
+        margin: 0;
+        background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+        height: 100vh;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+    .container {
+        background: #111;
+        padding: 20px;
+        border-radius: 12px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+        color: white;
+        animation: fadeIn 0.5s ease-in-out;
+    }
+    @keyframes fadeIn {
+        from {opacity: 0; transform: translateY(-10px);}
+        to {opacity: 1; transform: translateY(0);}
+    }
+    h2 {
+        text-align: center;
+        color: #00c6ff;
+        margin-bottom: 15px;
+    }
+    input, textarea, button {
+        width: 100%;
+        padding: 10px;
+        margin: 6px 0;
+        border: none;
+        border-radius: 6px;
+        font-size: 14px;
+    }
+    input, textarea {
+        background: #1e1e1e;
+        color: white;
+    }
+    input:focus, textarea:focus {
+        outline: none;
+        border: 1px solid #00c6ff;
+    }
+    button {
+        background: linear-gradient(to right, #00c6ff, #0072ff);
+        color: white;
+        font-weight: bold;
+        border: none;
+        cursor: pointer;
+        transition: transform 0.2s ease;
+    }
+    button:hover {
+        transform: scale(1.05);
+    }
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 15px;
+        font-size: 14px;
+    }
+    th, td {
+        border: 1px solid #444;
+        padding: 8px;
+        text-align: center;
+        color: white;
+    }
+    th {
+        background: #0072ff;
+    }
+    tr:hover {
+        background-color: rgba(0, 198, 255, 0.2);
+    }
+    .cards {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 15px;
+    }
+    .card {
+        flex: 1;
+        padding: 15px;
+        border-radius: 8px;
+        color: white;
+        font-weight: bold;
+        text-align: center;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+        font-size: 18px;
+    }
+    .total-products { background: linear-gradient(135deg, #ff512f, #dd2476); }
+    .total-stock { background: linear-gradient(135deg, #00b09b, #96c93d); }
+    .total-value { background: linear-gradient(135deg, #396afc, #2948ff); }
+    .action-btn {
+        padding: 5px 8px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 12px;
+    }
+    .edit-btn {
+        background: orange;
+        color: white;
+    }
+    .delete-btn {
+        background: red;
+        color: white;
+    }
+</style>
+</head>
+<body>
+
+<!-- LOGIN FORM -->
+<div class="container" id="loginBox" style="width: 400px;">
+    <h2>Login</h2>
+    <input type="text" id="username" placeholder="Username">
+    <input type="password" id="password" placeholder="Password">
+    <button onclick="login()">Login</button>
+    <p id="loginMsg" style="color:red; text-align:center;"></p>
+</div>
+
+<!-- PRODUCT PAGE -->
+<div class="container" id="productBox" style="display:none; width: 90%; max-width: 900px;">
+    <h2>Dashboard</h2>
+    <div class="cards">
+        <div class="card total-products">Products: <span id="totalProducts">0</span></div>
+        <div class="card total-stock">Total Stock: <span id="totalStock">0</span></div>
+        <div class="card total-value">Total Value: ₹<span id="totalValue">0</span></div>
+    </div>
+
+    <h2>Add / Edit Product</h2>
+    <input type="text" id="pname" placeholder="Product Name">
+    <input type="number" id="pprice" placeholder="Price">
+    <input type="number" id="pstock" placeholder="Stock">
+    <textarea id="pdesc" placeholder="Description"></textarea>
+    <button id="addBtn" onclick="addProduct()">Add Product</button>
+    <button id="updateBtn" onclick="updateProduct()" style="display:none;">Update Product</button>
+    <p id="msg" style="color:red; text-align:center;"></p>
+
+    <h2>Product List</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Name</th><th>Price</th><th>Stock</th><th>Description</th><th>Actions</th>
+            </tr>
+        </thead>
+        <tbody id="productTable"></tbody>
+    </table>
+</div>
+
+<script>
+    let editIndex = null;
+
+    function login() {
+        let user = document.getElementById('username').value.trim();
+        let pass = document.getElementById('password').value.trim();
+        if (user === "admin" && pass === "admin@123") {
+            document.getElementById('loginBox').style.display = 'none';
+            document.getElementById('productBox').style.display = 'block';
+            loadProducts();
+        } else {
+            document.getElementById('loginMsg').textContent = "Invalid credentials!";
+        }
+    }
+
+    function addProduct() {
+        let name = document.getElementById('pname').value.trim();
+        let price = parseFloat(document.getElementById('pprice').value.trim());
+        let stock = parseInt(document.getElementById('pstock').value.trim());
+        let desc = document.getElementById('pdesc').value.trim();
+        let msg = document.getElementById('msg');
+
+        if (!name || !price || !stock || !desc) {
+            msg.textContent = "All fields are required!";
+            return;
+        }
+        if (price <= 0 || stock < 0) {
+            msg.textContent = "Enter valid price and stock!";
+            return;
+        }
+        msg.textContent = "";
+
+        let products = JSON.parse(localStorage.getItem('products')) || [];
+        products.push({ name, price, stock, desc });
+        localStorage.setItem('products', JSON.stringify(products));
+
+        clearForm();
+        loadProducts();
+    }
+
+    function loadProducts() {
+        let products = JSON.parse(localStorage.getItem('products')) || [];
+        let table = document.getElementById('productTable');
+        table.innerHTML = "";
+        let totalStock = 0;
+        let totalValue = 0;
+
+        products.forEach((p, index) => {
+            totalStock += parseInt(p.stock);
+            totalValue += parseFloat(p.price) * parseInt(p.stock);
+            let row = `<tr>
+                <td>${p.name}</td>
+                <td>${p.price}</td>
+                <td>${p.stock}</td>
+                <td>${p.desc}</td>
+                <td>
+                    <button class="action-btn edit-btn" onclick="editProduct(${index})">Edit</button>
+                    <button class="action-btn delete-btn" onclick="deleteProduct(${index})">Delete</button>
+                </td>
+            </tr>`;
+            table.innerHTML += row;
+        });
+
+        document.getElementById('totalProducts').textContent = products.length;
+        document.getElementById('totalStock').textContent = totalStock;
+        document.getElementById('totalValue').textContent = totalValue.toFixed(2);
+    }
+
+    function deleteProduct(index) {
+        let products = JSON.parse(localStorage.getItem('products')) || [];
+        products.splice(index, 1);
+        localStorage.setItem('products', JSON.stringify(products));
+        loadProducts();
+    }
+
+    function editProduct(index) {
+        let products = JSON.parse(localStorage.getItem('products')) || [];
+        let p = products[index];
+        document.getElementById('pname').value = p.name;
+        document.getElementById('pprice').value = p.price;
+        document.getElementById('pstock').value = p.stock;
+        document.getElementById('pdesc').value = p.desc;
+        document.getElementById('addBtn').style.display = 'none';
+        document.getElementById('updateBtn').style.display = 'block';
+        editIndex = index;
+    }
+
+    function updateProduct() {
+        let name = document.getElementById('pname').value.trim();
+        let price = parseFloat(document.getElementById('pprice').value.trim());
+        let stock = parseInt(document.getElementById('pstock').value.trim());
+        let desc = document.getElementById('pdesc').value.trim();
+        let products = JSON.parse(localStorage.getItem('products')) || [];
+
+        products[editIndex] = { name, price, stock, desc };
+        localStorage.setItem('products', JSON.stringify(products));
+
+        clearForm();
+        document.getElementById('addBtn').style.display = 'block';
+        document.getElementById('updateBtn').style.display = 'none';
+        editIndex = null;
+        loadProducts();
+    }
+
+    function clearForm() {
+        document.getElementById('pname').value = "";
+        document.getElementById('pprice').value = "";
+        document.getElementById('pstock').value = "";
+        document.getElementById('pdesc').value = "";
+    }
+</script>
+
+</body>
+</html>
